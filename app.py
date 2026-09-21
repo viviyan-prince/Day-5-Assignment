@@ -12,12 +12,10 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "students.db")
 
 
 def init_db() -> None:
-    """Create students.db and seed the assignment data if needed."""
     conn = sqlite3.connect(DB_PATH)
     try:
         conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS students (
+            """CREATE TABLE IF NOT EXISTS students (
                 student_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 department TEXT NOT NULL,
@@ -25,8 +23,7 @@ def init_db() -> None:
                 database INTEGER NOT NULL,
                 ai INTEGER NOT NULL,
                 web INTEGER NOT NULL
-            )
-            """
+            )"""
         )
         students = [
             ("22CS045", "Dhanushya", "Computer Science", 85, 72, 90, 78),
@@ -36,11 +33,9 @@ def init_db() -> None:
             ("22CS049", "Meena", "Computer Science", 78, 85, 80, 88),
         ]
         conn.executemany(
-            """
-            INSERT OR IGNORE INTO students
+            """INSERT OR IGNORE INTO students
             (student_id, name, department, python, database, ai, web)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
+            VALUES (?, ?, ?, ?, ?, ?, ?)""",
             students,
         )
         conn.commit()
@@ -62,7 +57,7 @@ def _get_student(student_id: str) -> tuple[Any, ...] | None:
 
 @tool
 def get_student_info(student_id: str) -> str:
-    """Get a student's name and department from the students database."""
+    """Get a student's name and department."""
     student = _get_student(student_id)
     if student is None:
         return f"No student was found with ID {student_id}."
@@ -71,7 +66,7 @@ def get_student_info(student_id: str) -> str:
 
 @tool
 def get_student_marks(student_id: str) -> str:
-    """Get Python, Database, AI, and Web marks for a student."""
+    """Get Python, Database, AI, and Web marks."""
     student = _get_student(student_id)
     if student is None:
         return f"No student was found with ID {student_id}."
@@ -113,20 +108,17 @@ def _safe_eval(node: ast.AST) -> float:
 
 @tool
 def calculator(expression: str) -> str:
-    """Calculate a basic arithmetic expression such as '85 + 72 + 90 + 78' or '325 / 4'."""
+    """Calculate a basic arithmetic expression."""
     try:
-        tree = ast.parse(expression.strip(), mode="eval")
-        result = _safe_eval(tree)
-        if result.is_integer():
-            return str(int(result))
-        return f"{result:.4f}".rstrip("0").rstrip(".")
+        result = _safe_eval(ast.parse(expression.strip(), mode="eval"))
+        return str(int(result)) if result.is_integer() else f"{result:.4f}".rstrip("0").rstrip(".")
     except Exception as exc:
         return f"Calculator error: {exc}"
 
 
 @tool
 def get_passing_rules() -> str:
-    """Return the university passing rules from the assignment."""
+    """Return the university passing rules."""
     return (
         "University passing rules:\n"
         "1. Minimum overall average: 40%\n"
@@ -135,44 +127,29 @@ def get_passing_rules() -> str:
 
 
 def build_agent():
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        raise RuntimeError(
-            "GOOGLE_API_KEY is not set. Add your Gemini API key to the environment."
-        )
-
+    if not os.getenv("GOOGLE_API_KEY"):
+        raise RuntimeError("GOOGLE_API_KEY is not set.")
     model = ChatGoogleGenerativeAI(
         model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         temperature=0,
     )
-
     tools = [get_student_info, get_student_marks, calculator, get_passing_rules]
-
     system_prompt = """
 You are a student information assistant.
-
-Use the provided tools to answer questions about students. Decide yourself which
-one or more tools are necessary; do not follow a hard-coded tool sequence.
-
-Rules:
-- Use database tools for student information and marks.
-- Use calculator for totals and averages rather than calculating them yourself.
-- Use get_passing_rules when the user asks whether a student passes or satisfies
-  university requirements.
-- Never invent student data or university rules.
-- Give short, clear, polite answers.
-- If a student ID does not exist, say so clearly.
-- When evaluating passing eligibility, verify both the overall average and every
-  subject mark against the supplied rules.
+Choose tools dynamically; do not follow a hard-coded sequence.
+Use database tools for student information and marks.
+Use calculator for totals and averages.
+Use get_passing_rules for pass/eligibility questions.
+Never invent student data or university rules.
+Give short, clear answers.
 """
-
     return create_agent(model, tools=tools, system_prompt=system_prompt)
 
 
 def ask(agent, question: str) -> str:
     result = agent.invoke({"messages": [{"role": "user", "content": question}]})
-    message = result["messages"][-1]
-    return message.content if isinstance(message.content, str) else str(message.content)
+    content = result["messages"][-1].content
+    return content if isinstance(content, str) else str(content)
 
 
 if __name__ == "__main__":
@@ -186,4 +163,4 @@ if __name__ == "__main__":
         try:
             print("Agent:", ask(agent, question), "\n")
         except Exception as exc:
-            print(f"Error: {exc}\n")
+            print("Error:", exc)
